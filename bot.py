@@ -5,7 +5,7 @@ from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.types import KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove, BufferedInputFile
+from aiogram.types import KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
 import gspread
 from google.oauth2.service_account import Credentials
 
@@ -376,7 +376,7 @@ async def send_to_admin_channel(user: types.User, name: str, phone: str):
         logging.error(f"Ошибка отправки в админ канал: {e}")
 
 async def send_congratulations(message: types.Message, name: str):
-    """Отправка поздравительного сообщения с изображением"""
+    """Отправка поздравительного сообщения"""
     try:
         congratulations_text = (
             f"""Спасибо, <b>{name}</b>!
@@ -386,25 +386,10 @@ async def send_congratulations(message: types.Message, name: str):
 📍 <b>Официальный фирменный магазин Levi's®ТРЦ МАКСИ, 1й этаж</b>"""
         )
         
-        # Используем путь к изображению из конфигурации
-        image_path = CONGRATULATIONS_IMAGE_PATH
-        
-        try:
-            # Попробуем отправить с изображением
-            with open(image_path, 'rb') as file:
-                photo = BufferedInputFile(file.read(), filename="congratulations.png")
-                await message.answer_photo(
-                    photo=photo,
-                    caption=congratulations_text,
-                    parse_mode="HTML"
-                )
-        except FileNotFoundError:
-            # Если изображение не найдено, отправляем только текст
-            await message.answer(
-                f"🖼️ [Здесь должно быть изображение]\n\n{congratulations_text}",
-                parse_mode="HTML"
-            )
-            logging.warning("Изображение для поздравления не найдено")
+        await message.answer(
+            congratulations_text,
+            parse_mode="HTML"
+        )
         
     except Exception as e:
         logging.error(f"Ошибка отправки поздравления: {e}")
