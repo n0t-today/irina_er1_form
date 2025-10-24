@@ -5,7 +5,7 @@ from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.types import KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
+from aiogram.types import KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove, BufferedInputFile
 import gspread
 from google.oauth2.service_account import Credentials
 
@@ -376,7 +376,7 @@ async def send_to_admin_channel(user: types.User, name: str, phone: str):
         logging.error(f"Ошибка отправки в админ канал: {e}")
 
 async def send_congratulations(message: types.Message, name: str):
-    """Отправка поздравительного сообщения"""
+    """Отправка поздравительного сообщения с изображением"""
     try:
         congratulations_text = (
             f"""🎉 <b>Поздравляем, {name}!</b>
@@ -387,10 +387,25 @@ async def send_congratulations(message: types.Message, name: str):
 📍 <b>ТРК ТАНДЕМ 2 этаж</b>"""
         )
         
-        await message.answer(
-            congratulations_text,
-            parse_mode="HTML"
-        )
+        # Путь к изображению
+        image_path = "image.jpg"
+        
+        try:
+            # Отправляем изображение с подписью
+            with open(image_path, 'rb') as file:
+                photo = BufferedInputFile(file.read(), filename="congratulations.jpg")
+                await message.answer_photo(
+                    photo=photo,
+                    caption=congratulations_text,
+                    parse_mode="HTML"
+                )
+        except FileNotFoundError:
+            # Если изображение не найдено, отправляем только текст
+            await message.answer(
+                congratulations_text,
+                parse_mode="HTML"
+            )
+            logging.warning("Изображение для поздравления не найдено")
         
     except Exception as e:
         logging.error(f"Ошибка отправки поздравления: {e}")
