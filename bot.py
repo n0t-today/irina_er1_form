@@ -22,7 +22,7 @@ except ImportError:
     GOOGLE_CREDENTIALS_PATH = "google_credentials.json"
     GOOGLE_SHEET_ID = "YOUR_GOOGLE_SHEET_ID"
     DEFAULT_ADMINS = [7533811917]  # Админ по умолчанию
-    CONGRATULATIONS_IMAGE_PATH = "congratulations_image.jpg"
+    CONGRATULATIONS_IMAGE_PATH = "congratulations_image.png"
 
 # =====================================================
 # СОСТОЯНИЯ FSM
@@ -384,11 +384,11 @@ async def send_congratulations(message: types.Message, name: str):
 Вы стали участником программы лояльности Levi's. Теперь Вам доступны скидки и привилегии как держателю карты. 
 
 🛍️ <b>Ждём вас за покупками!</b>
-📍 <b>ТРК ТАНДЕМ 2 этаж</b>"""
+📍 <b>ТРЦ ЗОЛОТОЙ ВАВИЛОН 1 этаж</b>"""
         )
         
         # Путь к изображению
-        image_path = "image.jpg"
+        image_path = "image.png"
         
         try:
             # Отправляем изображение с подписью

@@ -55,7 +55,7 @@ GOOGLE_SHEET_ID = "YOUR_GOOGLE_SHEET_ID"
 
 ### 5. Добавление изображения
 
-Поместите изображение `congratulations_image.jpg` в папку с ботом для поздравительного сообщения.
+Поместите изображение `congratulations_image.png` в папку с ботом для поздравительного сообщения.
 
 ## Запуск
 
@@ -69,7 +69,7 @@ python bot.py
 ├── bot.py                    # Основной файл бота
 ├── requirements.txt          # Зависимости Python
 ├── google_credentials.json   # Ключи Google Service Account (создать самостоятельно)
-├── congratulations_image.jpg # Изображение для поздравления (добавить самостоятельно)
+├── congratulations_image.png # Изображение для поздравления (добавить самостоятельно)
 └── README.md                # Инструкции по установке
 ```
 

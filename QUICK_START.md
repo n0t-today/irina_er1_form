@@ -29,7 +29,7 @@ GOOGLE_SHEET_ID = "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms"
 ### Шаг 4: Добавьте изображение
 ```bash
 # Поместите изображение для поздравления
-cp your_image.jpg congratulations_image.jpg
+cp your_image.png congratulations_image.png
 ```
 
 ## 2️⃣ Запуск
