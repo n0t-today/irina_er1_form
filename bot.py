@@ -309,14 +309,10 @@ async def cmd_start(message: types.Message, state: FSMContext):
         )
         return
     
-    # Создаем инлайн клавиатуру с городами (по 2 кнопки в ряду)
+    # Создаем инлайн клавиатуру с городами (по одной кнопке в ряду)
     keyboard_buttons = []
-    row = []
-    for i, city in enumerate(cities_list):
-        row.append(InlineKeyboardButton(text=city, callback_data=f"city:{city}"))
-        if len(row) == 2 or i == len(cities_list) - 1:
-            keyboard_buttons.append(row)
-            row = []
+    for city in cities_list:
+        keyboard_buttons.append([InlineKeyboardButton(text=city, callback_data=f"city:{city}")])
     
     city_keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
     
@@ -759,14 +755,10 @@ async def callback_start_registration(callback: types.CallbackQuery, state: FSMC
         )
         return
     
-    # Создаем инлайн клавиатуру с городами (по 2 кнопки в ряду)
+    # Создаем инлайн клавиатуру с городами (по одной кнопке в ряду)
     keyboard_buttons = []
-    row = []
-    for i, city in enumerate(cities_list):
-        row.append(InlineKeyboardButton(text=city, callback_data=f"city:{city}"))
-        if len(row) == 2 or i == len(cities_list) - 1:
-            keyboard_buttons.append(row)
-            row = []
+    for city in cities_list:
+        keyboard_buttons.append([InlineKeyboardButton(text=city, callback_data=f"city:{city}")])
     
     city_keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
     
