@@ -29,6 +29,7 @@ except ImportError:
 # =====================================================
 
 class RegistrationForm(StatesGroup):
+    waiting_for_city = State()
     waiting_for_name = State()
     waiting_for_phone = State()
 
@@ -69,6 +70,47 @@ def init_google_sheets():
     except Exception as e:
         logging.error(f"Ошибка инициализации Google Sheets: {e}")
         return None
+
+def get_cities_and_addresses():
+    """Получение списка городов и адресов из листа 'Города'"""
+    try:
+        # Определяем область доступа
+        scopes = [
+            "https://www.googleapis.com/auth/spreadsheets",
+            "https://www.googleapis.com/auth/drive"
+        ]
+        
+        # Загружаем учетные данные
+        credentials = Credentials.from_service_account_file(
+            GOOGLE_CREDENTIALS_PATH, scopes=scopes
+        )
+        
+        # Создаем клиент
+        client = gspread.authorize(credentials)
+        
+        # Открываем таблицу и лист "Города"
+        spreadsheet = client.open_by_key(GOOGLE_SHEET_ID)
+        cities_sheet = spreadsheet.worksheet("Города")
+        
+        # Получаем данные из столбцов A и B начиная со второй строки
+        cities_data = cities_sheet.get('A2:B')
+        
+        # Создаем словарь {город: адрес}
+        cities_dict = {}
+        cities_list = []
+        
+        for row in cities_data:
+            if row and len(row) >= 1 and row[0].strip():  # Проверяем что город не пустой
+                city = row[0].strip()
+                address = row[1].strip() if len(row) >= 2 else "Адрес не указан"
+                cities_dict[city] = address
+                cities_list.append(city)
+        
+        return cities_list, cities_dict
+        
+    except Exception as e:
+        logging.error(f"Ошибка получения списка городов: {e}")
+        return [], {}
 
 def get_spreadsheet_info():
     """Получение информации о всей таблице и всех листах"""
@@ -128,8 +170,8 @@ def setup_google_sheet_headers():
         
         all_values = sheet.get_all_values()
         
-        # Проверяем наличие правильных заголовков
-        headers = ['Имя', 'Телефон', 'Username', 'User ID', 'Дата']
+        # Проверяем наличие правильных заголовков (с городом)
+        headers = ['Город', 'Имя', 'Телефон', 'Username', 'User ID', 'Дата']
         
         print(f"\n🔍 Проверка заголовков...")
         print(f"📝 Ожидаемые заголовки: {headers}")
@@ -157,7 +199,7 @@ def setup_google_sheet_headers():
         
         # Форматируем заголовки
         try:
-            sheet.format('A1:E1', {
+            sheet.format('A1:F1', {
                 "textFormat": {"bold": True},
                 "backgroundColor": {"red": 0.9, "green": 0.9, "blue": 0.9},
                 "horizontalAlignment": "CENTER"
@@ -172,7 +214,7 @@ def setup_google_sheet_headers():
         print(f"❌ Ошибка настройки заголовков: {e}")
         return False
 
-async def save_to_google_sheets(name: str, phone: str, username: str, user_id: int):
+async def save_to_google_sheets(name: str, phone: str, username: str, user_id: int, city: str):
     """Сохранение данных в Google Таблицы"""
     try:
         sheet = init_google_sheets()
@@ -180,20 +222,23 @@ async def save_to_google_sheets(name: str, phone: str, username: str, user_id: i
             # Проверяем наличие заголовков и создаем их если нужно
             all_values = sheet.get_all_values()
             
+            # Обновленные заголовки с городом
+            headers = ['Город', 'Имя', 'Телефон', 'Username', 'User ID', 'Дата']
+            
             # Если таблица пустая или первая строка не содержит заголовки
-            if not all_values or (all_values and all_values[0] != ['Имя', 'Телефон', 'Username', 'User ID', 'Дата']):
+            if not all_values or (all_values and all_values[0] != headers):
                 logging.info("Создание заголовков в Google Таблице...")
                 
                 # Если есть данные, но нет заголовков - вставляем их в начало
                 if all_values:
-                    sheet.insert_row(['Имя', 'Телефон', 'Username', 'User ID', 'Дата'], 1)
+                    sheet.insert_row(headers, 1)
                 else:
                     # Если таблица пустая - просто добавляем заголовки
-                    sheet.append_row(['Имя', 'Телефон', 'Username', 'User ID', 'Дата'])
+                    sheet.append_row(headers)
                 
                 # Форматируем заголовки (делаем жирными)
                 try:
-                    sheet.format('A1:E1', {
+                    sheet.format('A1:F1', {
                         "textFormat": {
                             "bold": True
                         },
@@ -209,9 +254,9 @@ async def save_to_google_sheets(name: str, phone: str, username: str, user_id: i
             # Добавляем новую строку с данными
             from datetime import datetime
             current_date = datetime.now().strftime("%d.%m.%Y %H:%M")
-            sheet.append_row([name, phone, username or "Не указан", user_id, current_date])
+            sheet.append_row([city, name, phone, username or "Не указан", user_id, current_date])
             
-            logging.info(f"Данные сохранены в Google Таблицы: {name}, {phone}")
+            logging.info(f"Данные сохранены в Google Таблицы: {city}, {name}, {phone}")
             return True
     except Exception as e:
         logging.error(f"Ошибка сохранения в Google Sheets: {e}")
@@ -248,13 +293,76 @@ async def cmd_start(message: types.Message, state: FSMContext):
     welcome_text = (
         """🎉 <b>Добро пожаловать!</b>
 
-Для участия <b>в программе лояльности Levi's</b> нам необходимо узнать ваше имя и номер телефона.
+Для участия <b>в программе лояльности Levi's</b> нам необходимо узнать некоторую информацию о вас.
 
-📝 <b>Введите ваше имя:</b>"""
+📍 <b>Для начала выберите ваш город:</b>"""
     )
     
-    await message.answer(welcome_text, parse_mode="HTML")
+    # Получаем список городов
+    cities_list, cities_dict = get_cities_and_addresses()
+    
+    if not cities_list:
+        await message.answer(
+            "❌ <b>Ошибка загрузки списка городов.</b>\n"
+            "Пожалуйста, попробуйте позже или обратитесь к администратору.",
+            parse_mode="HTML"
+        )
+        return
+    
+    # Создаем клавиатуру с городами (по 2 кнопки в ряду)
+    keyboard_buttons = []
+    row = []
+    for i, city in enumerate(cities_list):
+        row.append(KeyboardButton(text=city))
+        if len(row) == 2 or i == len(cities_list) - 1:
+            keyboard_buttons.append(row)
+            row = []
+    
+    city_keyboard = ReplyKeyboardMarkup(
+        keyboard=keyboard_buttons,
+        resize_keyboard=True,
+        one_time_keyboard=True
+    )
+    
+    await message.answer(welcome_text, reply_markup=city_keyboard, parse_mode="HTML")
+    await state.set_state(RegistrationForm.waiting_for_city)
+
+# =====================================================
+# ОБРАБОТЧИК ВЫБОРА ГОРОДА
+# =====================================================
+
+@dp.message(StateFilter(RegistrationForm.waiting_for_city))
+async def process_city(message: types.Message, state: FSMContext):
+    """Обработка выбора города"""
+    selected_city = message.text.strip()
+    
+    # Получаем актуальный список городов и адресов
+    cities_list, cities_dict = get_cities_and_addresses()
+    
+    # Проверяем, что город есть в списке
+    if selected_city not in cities_dict:
+        await message.answer(
+            "❌ <b>Пожалуйста, выберите город из предложенного списка.</b>",
+            parse_mode="HTML"
+        )
+        return
+    
+    # Сохраняем город и адрес в состоянии
+    await state.update_data(city=selected_city, address=cities_dict[selected_city])
+    
+    # Убираем клавиатуру и переходим к запросу имени
+    await message.answer(
+        f"✅ <b>Отлично! Город: {selected_city}</b>\n\n"
+        "📝 <b>Теперь введите ваше имя:</b>",
+        reply_markup=ReplyKeyboardRemove(),
+        parse_mode="HTML"
+    )
+    
     await state.set_state(RegistrationForm.waiting_for_name)
+
+# =====================================================
+# ОБРАБОТЧИК ВВОДА ИМЕНИ
+# =====================================================
 
 @dp.message(StateFilter(RegistrationForm.waiting_for_name))
 async def process_name(message: types.Message, state: FSMContext):
@@ -325,6 +433,8 @@ async def process_phone_data(message: types.Message, state: FSMContext, phone: s
     # Получаем сохраненные данные
     data = await state.get_data()
     name = data.get('name')
+    city = data.get('city', 'Не указан')
+    address = data.get('address', 'Не указан')
     
     # Очищаем состояние
     await state.clear()
@@ -337,24 +447,26 @@ async def process_phone_data(message: types.Message, state: FSMContext, phone: s
     )
     
     # Отправляем заявку в канал админов
-    await send_to_admin_channel(message.from_user, name, phone)
+    await send_to_admin_channel(message.from_user, name, phone, city)
     
     # Сохраняем в Google Таблицы
     await save_to_google_sheets(
         name=name,
         phone=phone,
         username=message.from_user.username,
-        user_id=message.from_user.id
+        user_id=message.from_user.id,
+        city=city
     )
     
     # Отправляем поздравительное сообщение с изображением
-    await send_congratulations(message, name)
+    await send_congratulations(message, name, address)
 
-async def send_to_admin_channel(user: types.User, name: str, phone: str):
+async def send_to_admin_channel(user: types.User, name: str, phone: str, city: str):
     """Отправка заявки в канал админов"""
     try:
         admin_message = (
             "🆕 <b>НОВАЯ ЗАЯВКА</b>\n\n"
+            f"📍 <b>Город:</b> {city}\n"
             f"👤 <b>Имя:</b> {name}\n"
             f"📞 <b>Телефон:</b> {phone}\n"
             f"🆔 <b>User ID:</b> <code>{user.id}</code>\n"
@@ -370,12 +482,12 @@ async def send_to_admin_channel(user: types.User, name: str, phone: str):
             disable_web_page_preview=True
         )
         
-        logging.info(f"Заявка отправлена в админ канал: {name}, {phone}")
+        logging.info(f"Заявка отправлена в админ канал: {name}, {phone}, {city}")
         
     except Exception as e:
         logging.error(f"Ошибка отправки в админ канал: {e}")
 
-async def send_congratulations(message: types.Message, name: str):
+async def send_congratulations(message: types.Message, name: str, address: str):
     """Отправка поздравительного сообщения с изображением"""
     try:
         congratulations_text = (
@@ -384,7 +496,7 @@ async def send_congratulations(message: types.Message, name: str):
 Вы стали участником программы лояльности Levi's. Теперь Вам доступны скидки и привилегии как держателю карты. 
 
 🛍️ <b>Ждём вас за покупками!</b>
-📍 <b>ТРЦ ЗОЛОТОЙ ВАВИЛОН 1 этаж</b>"""
+📍 <b>{address}</b>"""
         )
         
         # Путь к изображению
@@ -510,7 +622,7 @@ async def cmd_setup_sheet(message: types.Message):
         
         # Проверяем заголовки
         all_values = sheet.get_all_values()
-        headers = ['Имя', 'Телефон', 'Username', 'User ID', 'Дата']
+        headers = ['Город', 'Имя', 'Телефон', 'Username', 'User ID', 'Дата']
         
         if not all_values:
             headers_info = "📄 <b>Таблица пустая</b> - заголовки будут созданы"
@@ -634,13 +746,41 @@ async def callback_start_registration(callback: types.CallbackQuery, state: FSMC
     welcome_text = (
         """🎉 <b>Добро пожаловать!</b>
 
-Для участия в программе лояльности Levi's нам необходимо узнать ваше имя и номер телефона.
+Для участия <b>в программе лояльности Levi's</b> нам необходимо узнать некоторую информацию о вас.
 
-📝 <b>Введите ваше имя:</b>"""
+📍 <b>Для начала выберите ваш город:</b>"""
     )
     
-    await callback.message.edit_text(welcome_text, parse_mode="HTML")
-    await state.set_state(RegistrationForm.waiting_for_name)
+    # Получаем список городов
+    cities_list, cities_dict = get_cities_and_addresses()
+    
+    if not cities_list:
+        await callback.message.edit_text(
+            "❌ <b>Ошибка загрузки списка городов.</b>\n"
+            "Пожалуйста, попробуйте позже или обратитесь к администратору.",
+            parse_mode="HTML"
+        )
+        return
+    
+    # Создаем клавиатуру с городами (по 2 кнопки в ряду)
+    keyboard_buttons = []
+    row = []
+    for i, city in enumerate(cities_list):
+        row.append(KeyboardButton(text=city))
+        if len(row) == 2 or i == len(cities_list) - 1:
+            keyboard_buttons.append(row)
+            row = []
+    
+    city_keyboard = ReplyKeyboardMarkup(
+        keyboard=keyboard_buttons,
+        resize_keyboard=True,
+        one_time_keyboard=True
+    )
+    
+    # Удаляем inline сообщение и отправляем новое с reply клавиатурой
+    await callback.message.delete()
+    await callback.message.answer(welcome_text, reply_markup=city_keyboard, parse_mode="HTML")
+    await state.set_state(RegistrationForm.waiting_for_city)
 
 # =====================================================
 # ЗАПУСК БОТА
