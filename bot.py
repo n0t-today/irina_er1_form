@@ -5,7 +5,7 @@ from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.types import KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove, BufferedInputFile
+from aiogram.types import KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove, BufferedInputFile, InlineKeyboardButton, InlineKeyboardMarkup
 import gspread
 from google.oauth2.service_account import Credentials
 
@@ -309,20 +309,16 @@ async def cmd_start(message: types.Message, state: FSMContext):
         )
         return
     
-    # Создаем клавиатуру с городами (по 2 кнопки в ряду)
+    # Создаем инлайн клавиатуру с городами (по 2 кнопки в ряду)
     keyboard_buttons = []
     row = []
     for i, city in enumerate(cities_list):
-        row.append(KeyboardButton(text=city))
+        row.append(InlineKeyboardButton(text=city, callback_data=f"city:{city}"))
         if len(row) == 2 or i == len(cities_list) - 1:
             keyboard_buttons.append(row)
             row = []
     
-    city_keyboard = ReplyKeyboardMarkup(
-        keyboard=keyboard_buttons,
-        resize_keyboard=True,
-        one_time_keyboard=True
-    )
+    city_keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
     
     await message.answer(welcome_text, reply_markup=city_keyboard, parse_mode="HTML")
     await state.set_state(RegistrationForm.waiting_for_city)
@@ -331,18 +327,21 @@ async def cmd_start(message: types.Message, state: FSMContext):
 # ОБРАБОТЧИК ВЫБОРА ГОРОДА
 # =====================================================
 
-@dp.message(StateFilter(RegistrationForm.waiting_for_city))
-async def process_city(message: types.Message, state: FSMContext):
-    """Обработка выбора города"""
-    selected_city = message.text.strip()
+@dp.callback_query(F.data.startswith("city:"), StateFilter(RegistrationForm.waiting_for_city))
+async def process_city_callback(callback: types.CallbackQuery, state: FSMContext):
+    """Обработка выбора города через инлайн кнопку"""
+    await callback.answer()
+    
+    # Извлекаем название города из callback_data
+    selected_city = callback.data.split(":", 1)[1]
     
     # Получаем актуальный список городов и адресов
     cities_list, cities_dict = get_cities_and_addresses()
     
     # Проверяем, что город есть в списке
     if selected_city not in cities_dict:
-        await message.answer(
-            "❌ <b>Пожалуйста, выберите город из предложенного списка.</b>",
+        await callback.message.answer(
+            "❌ <b>Ошибка выбора города. Попробуйте снова.</b>",
             parse_mode="HTML"
         )
         return
@@ -350,11 +349,10 @@ async def process_city(message: types.Message, state: FSMContext):
     # Сохраняем город и адрес в состоянии
     await state.update_data(city=selected_city, address=cities_dict[selected_city])
     
-    # Убираем клавиатуру и переходим к запросу имени
-    await message.answer(
+    # Редактируем сообщение и переходим к запросу имени
+    await callback.message.edit_text(
         f"✅ <b>Отлично! Город: {selected_city}</b>\n\n"
         "📝 <b>Теперь введите ваше имя:</b>",
-        reply_markup=ReplyKeyboardRemove(),
         parse_mode="HTML"
     )
     
@@ -714,7 +712,6 @@ async def unknown_message(message: types.Message):
         welcomed_users.add(user_id)
         
         # Создаем кнопку СТАРТ
-        from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
         start_keyboard = InlineKeyboardMarkup(
             inline_keyboard=[
                 [InlineKeyboardButton(text="СТАРТ", callback_data="start_registration")]
@@ -762,24 +759,19 @@ async def callback_start_registration(callback: types.CallbackQuery, state: FSMC
         )
         return
     
-    # Создаем клавиатуру с городами (по 2 кнопки в ряду)
+    # Создаем инлайн клавиатуру с городами (по 2 кнопки в ряду)
     keyboard_buttons = []
     row = []
     for i, city in enumerate(cities_list):
-        row.append(KeyboardButton(text=city))
+        row.append(InlineKeyboardButton(text=city, callback_data=f"city:{city}"))
         if len(row) == 2 or i == len(cities_list) - 1:
             keyboard_buttons.append(row)
             row = []
     
-    city_keyboard = ReplyKeyboardMarkup(
-        keyboard=keyboard_buttons,
-        resize_keyboard=True,
-        one_time_keyboard=True
-    )
+    city_keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
     
-    # Удаляем inline сообщение и отправляем новое с reply клавиатурой
-    await callback.message.delete()
-    await callback.message.answer(welcome_text, reply_markup=city_keyboard, parse_mode="HTML")
+    # Редактируем сообщение с инлайн клавиатурой
+    await callback.message.edit_text(welcome_text, reply_markup=city_keyboard, parse_mode="HTML")
     await state.set_state(RegistrationForm.waiting_for_city)
 
 # =====================================================
