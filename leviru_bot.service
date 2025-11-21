@@ -1,0 +1,17 @@
+[Unit]
+Description=Levi's Telegram Bot
+After=network.target
+
+[Service]
+Type=simple
+User=n0t-today
+WorkingDirectory=/home/n0t-today/Документы/Работа/@irina_er1_form
+ExecStart=/home/n0t-today/Документы/Работа/@irina_er1_form/venv/bin/python /home/n0t-today/Документы/Работа/@irina_er1_form/bot.py
+Restart=always
+RestartSec=10
+StandardOutput=append:/home/n0t-today/Документы/Работа/@irina_er1_form/bot.log
+StandardError=append:/home/n0t-today/Документы/Работа/@irina_er1_form/bot_error.log
+
+[Install]
+WantedBy=multi-user.target
+
